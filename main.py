@@ -120,9 +120,10 @@ async def prompt_datetime(update, context, edit=False):
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
         if update.message:
-            await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+            msg = await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
         else:
-            await update.callback_query.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+            msg = await update.callback_query.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+        context.user_data['prompt_msg_id'] = msg.message_id
     return DATETIME
 
 async def prompt_txn_type(update, context, edit=False):
@@ -133,7 +134,8 @@ async def prompt_txn_type(update, context, edit=False):
     if edit:
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        msg = await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        context.user_data['prompt_msg_id'] = msg.message_id
     return TXN_TYPE
 
 async def prompt_amount(update, context, edit=False):
@@ -144,7 +146,8 @@ async def prompt_amount(update, context, edit=False):
     if edit:
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        msg = await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        context.user_data['prompt_msg_id'] = msg.message_id
     return AMOUNT
 
 async def prompt_category(update, context, edit=False):
@@ -180,7 +183,8 @@ async def prompt_title(update, context, edit=False):
     if edit:
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        msg = await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        context.user_data['prompt_msg_id'] = msg.message_id
     return TITLE
 
 async def prompt_note(update, context, edit=False):
@@ -194,7 +198,8 @@ async def prompt_note(update, context, edit=False):
     if edit:
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        msg = await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        context.user_data['prompt_msg_id'] = msg.message_id
     return NOTE
 
 async def prompt_account(update, context, edit=False):
@@ -205,7 +210,8 @@ async def prompt_account(update, context, edit=False):
     if edit:
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        msg = await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        context.user_data['prompt_msg_id'] = msg.message_id
     return ACCOUNT
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -265,6 +271,10 @@ async def handle_datetime_callback(update: Update, context: ContextTypes.DEFAULT
 
 async def handle_custom_datetime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['datetime_final'] = update.message.text.strip()
+    try: await update.message.delete()
+    except: pass
+    try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+    except: pass
     return await prompt_txn_type(update, context, edit=False)
 
 async def handle_txn_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -294,6 +304,8 @@ async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
              await update.message.delete()
         except:
              pass
+        try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+        except: pass
         return await prompt_category(update, context, edit=False)
     except ValueError:
         await update.message.reply_text("❌ Invalid amount! Please enter a valid number (e.g. 50 or 50.5).")
@@ -342,6 +354,8 @@ async def handle_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.delete()
     except:
          pass
+    try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+    except: pass
     return await prompt_note(update, context, edit=False)
 
 async def handle_title_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -359,6 +373,8 @@ async def handle_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
          await update.message.delete()
     except:
          pass
+    try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+    except: pass
     return await prompt_account(update, context, edit=False)
 
 async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
