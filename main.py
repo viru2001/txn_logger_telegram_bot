@@ -22,6 +22,8 @@ from telegram.ext import (
 from aiohttp import web
 import asyncio
 
+from date_time_picker import create_calendar, process_calendar_selection, create_time_keyboard, process_time_selection
+
 load_dotenv()
 
 logging.basicConfig(
@@ -90,7 +92,9 @@ async def handle_datetime_callback(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
     
-    if query.data == "CURRENT_DATE":
+    data = query.data
+    
+    if data == "CURRENT_DATE":
         keyboard = [
             [InlineKeyboardButton("Income", callback_data="Income"), InlineKeyboardButton("Expense", callback_data="Expense")]
         ]
@@ -98,8 +102,34 @@ async def handle_datetime_callback(update: Update, context: ContextTypes.DEFAULT
         await query.edit_message_text(text=f"Date: {context.user_data['datetime']}\n\nSelect the transaction type:", reply_markup=reply_markup)
         return TXN_TYPE
     
-    elif query.data == "CUSTOM_DATE":
-        await query.edit_message_text(text="Please type the date and time (e.g., YYYY-MM-DD HH:MM):")
+    elif data == "CUSTOM_DATE":
+        await query.edit_message_text(text="Please select a date:", reply_markup=create_calendar())
+        return DATETIME
+
+    elif data.startswith("CAL-"):
+        completed, date_str, new_markup = process_calendar_selection(query)
+        if new_markup:
+            await query.edit_message_text(text="Please select a date:", reply_markup=new_markup)
+        elif completed:
+            context.user_data['temp_date'] = date_str
+            await query.edit_message_text(text=f"Date selected: {date_str}\n\nPlease select the hour:", reply_markup=create_time_keyboard())
+        return DATETIME
+        
+    elif data.startswith("TIME-"):
+        completed, time_str, new_markup = process_time_selection(query)
+        if new_markup:
+            await query.edit_message_text(text=f"Date selected: {context.user_data['temp_date']}\n\nPlease select the minute:", reply_markup=new_markup)
+        elif completed:
+            context.user_data['datetime'] = f"{context.user_data['temp_date']} {time_str}"
+            keyboard = [
+                [InlineKeyboardButton("Income", callback_data="Income"), InlineKeyboardButton("Expense", callback_data="Expense")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(f"Date & Time saved: {context.user_data['datetime']}\n\nSelect the transaction type:", reply_markup=reply_markup)
+            return TXN_TYPE
+        return DATETIME
+
+    elif data == "IGNORE":
         return DATETIME
 
 async def handle_custom_datetime(update: Update, context: ContextTypes.DEFAULT_TYPE):
