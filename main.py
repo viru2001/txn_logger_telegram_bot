@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import gspread
 from google.oauth2.service_account import Credentials
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -71,6 +71,13 @@ def build_keyboard(options, columns=2, add_back=True, add_cancel=True):
         keyboard.append(nav_row)
         
     return keyboard
+
+async def remove_reply_keyboard(update, context):
+    try:
+        msg = await context.bot.send_message(update.effective_chat.id, "...", reply_markup=ReplyKeyboardRemove())
+        await msg.delete()
+    except Exception:
+        pass
 
 def get_summary(user_data, is_final=False):
     if is_final:
@@ -141,14 +148,28 @@ async def prompt_amount(update, context, edit=False):
     return AMOUNT
 
 async def prompt_category(update, context, edit=False):
-    keyboard = build_keyboard(CONFIG['categories'], columns=3, add_back=True)
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    text = get_summary(context.user_data) + "Select a Category:"
+    categories = CONFIG['categories']
+    keyboard = []
+    for i in range(0, len(categories), 2): 
+        row = [KeyboardButton(cat) for cat in categories[i:i+2]]
+        keyboard.append(row)
+    keyboard.append([KeyboardButton("🔙 Back"), KeyboardButton("❌ Cancel")])
     
-    if edit:
-        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+    text = get_summary(context.user_data) + "Select a Category from the menu below 👇:"
+    
+    if edit and update.callback_query:
+        try:
+            await update.callback_query.message.delete()
+        except:
+            pass
+            
+    if update.message:
+        msg = await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
     else:
-        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        msg = await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+        
+    context.user_data['prompt_msg_id'] = msg.message_id
     return CATEGORY
 
 async def prompt_title(update, context, edit=False):
@@ -288,17 +309,32 @@ async def handle_amount_callback(update: Update, context: ContextTypes.DEFAULT_T
         return await prompt_txn_type(update, context, edit=True)
 
 async def handle_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    text = update.message.text.strip()
     
-    if query.data == "CANCEL":
+    if text == "❌ Cancel":
+        await remove_reply_keyboard(update, context)
         return await cancel(update, context)
-    elif query.data == "BACK":
+    elif text == "🔙 Back":
+        await remove_reply_keyboard(update, context)
         context.user_data.pop('amount', None)
-        return await prompt_amount(update, context, edit=True)
+        try: await update.message.delete()
+        except: pass
+        try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+        except: pass
+        return await prompt_amount(update, context, edit=False)
         
-    context.user_data['category'] = query.data
-    return await prompt_title(update, context, edit=True)
+    if text not in CONFIG['categories']:
+        await update.message.reply_text("❌ Please select a category from the bottom menu.")
+        return CATEGORY
+        
+    context.user_data['category'] = text
+    try: await update.message.delete()
+    except: pass
+    try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+    except: pass
+    
+    await remove_reply_keyboard(update, context)
+    return await prompt_title(update, context, edit=False)
 
 async def handle_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['title'] = update.message.text.strip()
@@ -439,7 +475,7 @@ async def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_amount),
                 CallbackQueryHandler(handle_amount_callback)
             ],
-            CATEGORY: [CallbackQueryHandler(handle_category)],
+            CATEGORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_category)],
             TITLE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_title),
                 CallbackQueryHandler(handle_title_callback)
