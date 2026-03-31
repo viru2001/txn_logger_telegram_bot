@@ -1,0 +1,24 @@
+{
+  "categories": [
+    "Dining",
+    "Groceries",
+    "Shopping",
+    "Transit",
+    "Entertainment",
+    "Bills and Fee",
+    "Gifts",
+    "Beauty",
+    "Work",
+    "Travel",
+    "Gaming",
+    "Salary",
+    "Other"
+  ],
+  "accounts": [
+    "Millennia CC",
+    "Amazon Pay CC",
+    "HDFC Savings",
+    "ICICI Savings",
+    "Union Savings"
+  ]
+}
