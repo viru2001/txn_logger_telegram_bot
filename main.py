@@ -407,10 +407,15 @@ async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'title': data.get('title'),
             'category': data.get('category'),
         }
+        if data.get('datetime_final'):
+            # Cashew expects 'time' to be a full ISO 8601 string (e.g. YYYY-MM-DDTHH:MM:SS)
+            iso_time = data.get('datetime_final').replace(' ', 'T') + ":00"
+            params['time'] = iso_time
+                
         if data.get('account'):
             params['account'] = data.get('account')
         if data.get('note'):
-            params['note'] = data.get('note')
+            params['notes'] = data.get('note')
             
         qs = urlencode(params)
         cashew_link = f"https://cashewapp.web.app/addTransaction?{qs}"
