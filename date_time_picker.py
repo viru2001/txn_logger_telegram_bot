@@ -51,6 +51,11 @@ def create_calendar(year=None, month=None):
     ]
     keyboard.append(row)
     
+    keyboard.append([
+        InlineKeyboardButton("🔙 Back to Date Options", callback_data="BACK_DATE_OPTIONS"),
+        InlineKeyboardButton("❌ Cancel", callback_data="CANCEL")
+    ])
+    
     return InlineKeyboardMarkup(keyboard)
 
 def process_calendar_selection(query):
@@ -93,6 +98,11 @@ def create_time_keyboard(hour=None, minute=None):
                 row.append(InlineKeyboardButton(f"{m:02d}", callback_data=f"TIME-MIN-{hour}-{m}"))
             keyboard.append(row)
             
+    keyboard.append([
+        InlineKeyboardButton("🔙 Back to Calendar", callback_data="BACK_CALENDAR"),
+        InlineKeyboardButton("❌ Cancel", callback_data="CANCEL")
+    ])
+
     return InlineKeyboardMarkup(keyboard)
 
 def process_time_selection(query):

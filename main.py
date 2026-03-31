@@ -55,12 +55,137 @@ def get_sheet():
         raise ValueError("GOOGLE_SHEET_ID not found in environment variables.")
     return client.open_by_key(sheet_id).sheet1
 
-def build_keyboard(options, columns=2):
+def build_keyboard(options, columns=2, add_back=True, add_cancel=True):
     keyboard = []
     for i in range(0, len(options), columns):
         row = [InlineKeyboardButton(opt, callback_data=opt) for opt in options[i:i+columns]]
         keyboard.append(row)
+    
+    nav_row = []
+    if add_back:
+        nav_row.append(InlineKeyboardButton("🔙 Back", callback_data="BACK"))
+    if add_cancel:
+        nav_row.append(InlineKeyboardButton("❌ Cancel", callback_data="CANCEL"))
+        
+    if nav_row:
+        keyboard.append(nav_row)
+        
     return keyboard
+
+def get_summary(user_data, is_final=False):
+    if is_final:
+        lines = ["✅ Transaction Saved & Logged! ✅\n"]
+    else:
+        lines = ["📝 Transaction Progress:\n"]
+        
+    if user_data.get('datetime_final'):
+        lines.append(f"📅 Date/Time: {user_data['datetime_final']}")
+    if user_data.get('type'):
+        lines.append(f"🔄 Type: {user_data['type']}")
+    if user_data.get('amount'):
+        lines.append(f"💰 Amount: {user_data['amount']}")
+    if user_data.get('category'):
+        lines.append(f"🏷️ Category: {user_data['category']}")
+    if user_data.get('title'):
+        lines.append(f"📝 Title: {user_data['title']}")
+    if 'note' in user_data and user_data['note']:
+        lines.append(f"🗒️ Note: {user_data['note']}")
+    if user_data.get('account'):
+        lines.append(f"🏦 Account: {user_data['account']}")
+        
+    # Return joined lines, followed by a double newline if there's more text (which prompts will append)
+    # But if is_final is True, we don't necessarily need prompt padding, though keeping it is harmless.
+    return "\n".join(lines) + ("\n\n" if not is_final else "")
+
+async def prompt_datetime(update, context, edit=False):
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    context.user_data['datetime'] = now_str
+    
+    keyboard = [
+        [InlineKeyboardButton(f"Use Current: {now_str}", callback_data="CURRENT_DATE")],
+        [InlineKeyboardButton("Custom Date", callback_data="CUSTOM_DATE")],
+        [InlineKeyboardButton("❌ Cancel", callback_data="CANCEL")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = get_summary(context.user_data) + "When did this transaction happen?"
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        if update.message:
+            await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+        else:
+            await update.callback_query.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    return DATETIME
+
+async def prompt_txn_type(update, context, edit=False):
+    keyboard = build_keyboard(["Income", "Expense"], add_back=True)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = get_summary(context.user_data) + "Select the transaction type:"
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+    return TXN_TYPE
+
+async def prompt_amount(update, context, edit=False):
+    keyboard = build_keyboard([], add_back=True)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = get_summary(context.user_data) + "Please type the exact amount (numbers only):"
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+    return AMOUNT
+
+async def prompt_category(update, context, edit=False):
+    keyboard = build_keyboard(CONFIG['categories'], columns=3, add_back=True)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = get_summary(context.user_data) + "Select a Category:"
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+    return CATEGORY
+
+async def prompt_title(update, context, edit=False):
+    keyboard = build_keyboard([], add_back=True)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = get_summary(context.user_data) + "Please type a Title for this transaction:"
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+    return TITLE
+
+async def prompt_note(update, context, edit=False):
+    keyboard = [
+        [InlineKeyboardButton("Skip Note", callback_data="SKIP_NOTE")],
+        [InlineKeyboardButton("🔙 Back", callback_data="BACK"), InlineKeyboardButton("❌ Cancel", callback_data="CANCEL")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = get_summary(context.user_data) + "Please type a Note (description) or click Skip:"
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+    return NOTE
+
+async def prompt_account(update, context, edit=False):
+    keyboard = build_keyboard(CONFIG['accounts'], columns=2, add_back=True)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = get_summary(context.user_data) + "Finally, select the Account:"
+    
+    if edit:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    else:
+        await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
+    return ACCOUNT
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -71,145 +196,165 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def add_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    context.user_data['datetime'] = now_str
-    
-    keyboard = [
-        [InlineKeyboardButton(f"Use Current: {now_str}", callback_data="CURRENT_DATE")],
-        [InlineKeyboardButton("Custom Date", callback_data="CUSTOM_DATE")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    text = "When did this transaction happen?"
-    if update.message:
-        await update.message.reply_text(text, reply_markup=reply_markup)
-    else:
-        await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
-    
-    return DATETIME
+    return await prompt_datetime(update, context, edit=False)
 
 async def handle_datetime_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     data = query.data
     
+    if data == "CANCEL":
+        return await cancel(update, context)
+        
     if data == "CURRENT_DATE":
-        keyboard = [
-            [InlineKeyboardButton("Income", callback_data="Income"), InlineKeyboardButton("Expense", callback_data="Expense")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text=f"Date: {context.user_data['datetime']}\n\nSelect the transaction type:", reply_markup=reply_markup)
-        return TXN_TYPE
+        context.user_data['datetime_final'] = context.user_data['datetime']
+        return await prompt_txn_type(update, context, edit=True)
     
-    elif data == "CUSTOM_DATE":
-        await query.edit_message_text(text="Please select a date:", reply_markup=create_calendar())
+    elif data == "CUSTOM_DATE" or data == "BACK_CALENDAR":
+        text = get_summary(context.user_data) + "Please select a date:"
+        await query.edit_message_text(text, reply_markup=create_calendar(), parse_mode="Markdown")
         return DATETIME
+
+    elif data == "BACK_DATE_OPTIONS":
+        return await prompt_datetime(update, context, edit=True)
 
     elif data.startswith("CAL-"):
         completed, date_str, new_markup = process_calendar_selection(query)
         if new_markup:
-            await query.edit_message_text(text="Please select a date:", reply_markup=new_markup)
+            text = get_summary(context.user_data) + "Please select a date:"
+            await query.edit_message_text(text, reply_markup=new_markup, parse_mode="Markdown")
         elif completed:
             context.user_data['temp_date'] = date_str
-            await query.edit_message_text(text=f"Date selected: {date_str}\n\nPlease select the hour:", reply_markup=create_time_keyboard())
+            text = get_summary(context.user_data) + f"**{date_str}** selected.\n\nPlease select the hour:"
+            await query.edit_message_text(text, reply_markup=create_time_keyboard(), parse_mode="Markdown")
         return DATETIME
         
     elif data.startswith("TIME-"):
         completed, time_str, new_markup = process_time_selection(query)
         if new_markup:
-            await query.edit_message_text(text=f"Date selected: {context.user_data['temp_date']}\n\nPlease select the minute:", reply_markup=new_markup)
+            text = get_summary(context.user_data) + f"**{context.user_data['temp_date']}** selected.\n\nPlease select the minute:"
+            await query.edit_message_text(text, reply_markup=new_markup, parse_mode="Markdown")
         elif completed:
-            context.user_data['datetime'] = f"{context.user_data['temp_date']} {time_str}"
-            keyboard = [
-                [InlineKeyboardButton("Income", callback_data="Income"), InlineKeyboardButton("Expense", callback_data="Expense")]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await query.edit_message_text(f"Date & Time saved: {context.user_data['datetime']}\n\nSelect the transaction type:", reply_markup=reply_markup)
-            return TXN_TYPE
+            context.user_data['datetime_final'] = f"{context.user_data['temp_date']} {time_str}"
+            return await prompt_txn_type(update, context, edit=True)
         return DATETIME
 
     elif data == "IGNORE":
         return DATETIME
 
 async def handle_custom_datetime(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['datetime'] = update.message.text.strip()
-    keyboard = [
-        [InlineKeyboardButton("Income", callback_data="Income"), InlineKeyboardButton("Expense", callback_data="Expense")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Custom date saved!\n\nSelect the transaction type:", reply_markup=reply_markup)
-    return TXN_TYPE
+    context.user_data['datetime_final'] = update.message.text.strip()
+    return await prompt_txn_type(update, context, edit=False)
 
 async def handle_txn_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
+    if query.data == "CANCEL":
+        return await cancel(update, context)
+    elif query.data == "BACK":
+        context.user_data.pop('datetime_final', None)
+        return await prompt_datetime(update, context, edit=True)
+        
     context.user_data['type'] = query.data
-    await query.edit_message_text(text=f"Type: {query.data}\n\nPlease type the exact amount (numbers only):")
-    return AMOUNT
+    return await prompt_amount(update, context, edit=True)
 
 async def handle_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         amount = float(update.message.text.strip())
-        if context.user_data['type'] == 'Expense' and amount > 0:
+        if context.user_data.get('type') == 'Expense' and amount > 0:
             amount = -amount
-        elif context.user_data['type'] == 'Income' and amount < 0:
+        elif context.user_data.get('type') == 'Income' and amount < 0:
             amount = abs(amount)
             
         context.user_data['amount'] = amount
-        reply_markup = InlineKeyboardMarkup(build_keyboard(CONFIG['categories'], columns=3))
-        await update.message.reply_text(f"Amount logged: {amount}\n\nSelect a Category:", reply_markup=reply_markup)
-        return CATEGORY
+        # Safe deletion of user input for cleaner chat, if possible. Not strict.
+        try:
+             await update.message.delete()
+        except:
+             pass
+        return await prompt_category(update, context, edit=False)
     except ValueError:
-        await update.message.reply_text("Invalid amount! Please enter a valid number (e.g. 50 or 50.5).")
+        await update.message.reply_text("❌ Invalid amount! Please enter a valid number (e.g. 50 or 50.5).")
         return AMOUNT
+
+async def handle_amount_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "CANCEL":
+        return await cancel(update, context)
+    elif query.data == "BACK":
+        context.user_data.pop('type', None)
+        return await prompt_txn_type(update, context, edit=True)
 
 async def handle_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
+    if query.data == "CANCEL":
+        return await cancel(update, context)
+    elif query.data == "BACK":
+        context.user_data.pop('amount', None)
+        return await prompt_amount(update, context, edit=True)
+        
     context.user_data['category'] = query.data
-    await query.edit_message_text(f"Category: {query.data}\n\nPlease type a Title for this transaction:")
-    return TITLE
+    return await prompt_title(update, context, edit=True)
 
 async def handle_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['title'] = update.message.text.strip()
-    
-    keyboard = [[InlineKeyboardButton("Skip Note", callback_data="SKIP_NOTE")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(f"Title saved.\n\nPlease type a Note (description), or click Skip:", reply_markup=reply_markup)
-    return NOTE
+    try:
+         await update.message.delete()
+    except:
+         pass
+    return await prompt_note(update, context, edit=False)
+
+async def handle_title_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if query.data == "CANCEL":
+        return await cancel(update, context)
+    elif query.data == "BACK":
+        context.user_data.pop('category', None)
+        return await prompt_category(update, context, edit=True)
+
+async def handle_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['note'] = update.message.text.strip()
+    try:
+         await update.message.delete()
+    except:
+         pass
+    return await prompt_account(update, context, edit=False)
 
 async def handle_note_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    if query.data == "SKIP_NOTE":
+    if query.data == "CANCEL":
+        return await cancel(update, context)
+    elif query.data == "BACK":
+        context.user_data.pop('title', None)
+        return await prompt_title(update, context, edit=True)
+    elif query.data == "SKIP_NOTE":
         context.user_data['note'] = ""
-        reply_markup = InlineKeyboardMarkup(build_keyboard(CONFIG['accounts'], columns=2))
-        await query.edit_message_text(f"Note skipped!\n\nFinally, select the Account:", reply_markup=reply_markup)
-        return ACCOUNT
-
-async def handle_note(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data['note'] = update.message.text.strip()
-    
-    reply_markup = InlineKeyboardMarkup(build_keyboard(CONFIG['accounts'], columns=2))
-    await update.message.reply_text(f"Note saved!\n\nFinally, select the Account:", reply_markup=reply_markup)
-    return ACCOUNT
+        return await prompt_account(update, context, edit=True)
 
 async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
+    if query.data == "CANCEL":
+        return await cancel(update, context)
+    elif query.data == "BACK":
+        context.user_data.pop('note', None)
+        return await prompt_note(update, context, edit=True)
+        
     context.user_data['account'] = query.data
-    await query.edit_message_text("Processing your transaction... ")
+    await query.edit_message_text("🔄 Processing your transaction... ")
     
     try:
         data = context.user_data
-        # DateTime | Amount | Category | Title | Note | Account
         row = [
-            data.get('datetime'),
+            data.get('datetime_final'),
             data.get('amount'),
             data.get('category'),
             data.get('title'),
@@ -221,7 +366,6 @@ async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sheet = await loop.run_in_executor(None, get_sheet)
         await loop.run_in_executor(None, lambda: sheet.append_row(row))
         
-        # Dark Link formulation
         params = {
             'amount': data.get('amount'),
             'title': data.get('title'),
@@ -238,18 +382,9 @@ async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("🎯 Open in Cashew", url=cashew_link)]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        summary = (
-            "✅ *Transaction Saved & Logged!* ✅\n\n"
-            f"📅 *Date/Time:* {data.get('datetime')}\n"
-            f"💰 *Amount:* {data.get('amount')}\n"
-            f"🏷️ *Category:* {data.get('category')}\n"
-            f"📝 *Title:* {data.get('title')}\n"
-            f"🏦 *Account:* {data.get('account')}"
-        )
-        if data.get('note'):
-            summary += f"\n🗒️ *Note:* {data.get('note')}"
-            
-        await query.edit_message_text(text=summary, reply_markup=reply_markup, parse_mode="Markdown")
+        final_summary = get_summary(context.user_data, is_final=True)
+        
+        await query.edit_message_text(text=final_summary, reply_markup=reply_markup, parse_mode="Markdown")
         
     except FileNotFoundError as e:
          await query.edit_message_text(f"❌ Configuration Error: {str(e)}")
@@ -260,10 +395,11 @@ async def save_transaction(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     if update.message:
-        await update.message.reply_text("Transaction cancelled.")
-    else:
-        await update.callback_query.message.reply_text("Transaction cancelled.")
+        await update.message.reply_text("❌ Transaction cancelled.")
+    elif update.callback_query:
+        await update.callback_query.edit_message_text("❌ Transaction cancelled.")
     return ConversationHandler.END
 
 async def health_check(request):
@@ -299,9 +435,15 @@ async def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_custom_datetime)
             ],
             TXN_TYPE: [CallbackQueryHandler(handle_txn_type)],
-            AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_amount)],
+            AMOUNT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_amount),
+                CallbackQueryHandler(handle_amount_callback)
+            ],
             CATEGORY: [CallbackQueryHandler(handle_category)],
-            TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_title)],
+            TITLE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_title),
+                CallbackQueryHandler(handle_title_callback)
+            ],
             NOTE: [
                 CallbackQueryHandler(handle_note_callback),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_note)
