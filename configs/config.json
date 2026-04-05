@@ -14,6 +14,7 @@
     "Electricity Bill",
     "PNG Gas Bill",
     "Internet Bill",
+    "Credit Card Bill",
     "Mobile Recharge",
 
     "Groceries",
@@ -41,7 +42,8 @@
     "Furniture",
     "Books",
 
-    "Entertainment",
+    "OTT Subscriptions",
+    "Youtube Memberships",
     "Movies",
     "Gaming",
     "Party",
@@ -49,7 +51,6 @@
 
     "Travel",
 
-    "Subscriptions",
     "Work",
     "ATM Cash Withdrawal",
     "Cash Payment",
