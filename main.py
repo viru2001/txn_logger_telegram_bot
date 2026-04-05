@@ -5,16 +5,19 @@ from dotenv import load_dotenv
 
 from aiohttp import web
 
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
     ConversationHandler,
+    TypeHandler,
     filters,
 )
 
 from bot.constants import DATETIME, TXN_TYPE, AMOUNT, CATEGORY, TITLE, NOTE, ACCOUNT
+from bot.auth.auth import check_allowlist
 from bot.handlers.handlers import (
     start, add_start, cancel,
     handle_datetime_callback, handle_custom_datetime,
@@ -86,6 +89,7 @@ async def main():
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
+    application.add_handler(TypeHandler(Update, check_allowlist), group=-1)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(conv_handler)
     

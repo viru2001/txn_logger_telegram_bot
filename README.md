@@ -22,8 +22,9 @@ A Telegram bot to track expenses, log them into a Google Sheet, and generate Cas
 ### 3. Setup Your Environment
 1. Create a copy of `.env.example` and name it `.env`.
 2. Open `.env` and paste your Telegram Token.
-3. Open your Google Sheet in your browser and copy its ID from the URL. (e.g. `https://docs.google.com/spreadsheets/d/<COPY_THIS_ID_HERE>/edit`). Set this as `GOOGLE_SHEET_ID` in `.env`.
-4. Your Google Sheet should have the following headers (Row 1) in this exact order:
+3. (Optional) Add your allowable user IDs to `.env` as `ALLOWED_TELEGRAM_IDS` (comma separated) to restrict access. Example: `ALLOWED_TELEGRAM_IDS=12345678,98765432`
+4. Open your Google Sheet in your browser and copy its ID from the URL. (e.g. `https://docs.google.com/spreadsheets/d/<COPY_THIS_ID_HERE>/edit`). Set this as `GOOGLE_SHEET_ID` in `.env`.
+5. Your Google Sheet should have the following headers (Row 1) in this exact order:
    `DateTime | Amount | Category | Title | Note | Account`
 
 ### 4. Running Locally
