@@ -3,7 +3,11 @@ import logging
 import asyncio
 from urllib.parse import urlencode
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
+from telegram import (
+    Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, KeyboardButton,
+    InlineQueryResultArticle, InputTextMessageContent
+)
 from telegram.ext import ContextTypes, ConversationHandler
 
 from bot.constants import DATETIME, TXN_TYPE, AMOUNT, CATEGORY, TITLE, NOTE, ACCOUNT, CONFIG
@@ -63,29 +67,47 @@ async def prompt_amount(update, context, edit=False):
     return AMOUNT
 
 
-async def prompt_category(update, context, edit=False):
-    categories = CONFIG['categories']
+def _build_category_keyboard(categories):
+    """ReplyKeyboard with all categories + Back/Cancel. No search button needed — inline search handles it."""
     keyboard = []
-    for i in range(0, len(categories), 2): 
+    for i in range(0, len(categories), 2):
         row = [KeyboardButton(cat) for cat in categories[i:i+2]]
         keyboard.append(row)
     keyboard.append([KeyboardButton("🔙 Back"), KeyboardButton("❌ Cancel")])
-    
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-    text = get_summary(context.user_data) + "Select a Category from the menu below 👇:"
-    
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
+
+async def prompt_category(update, context, edit=False):
+    categories = CONFIG['categories']
+    chat_id = update.effective_chat.id
+
+    # Clean up old search hint message if re-entering this step
+    try: await context.bot.delete_message(chat_id, context.user_data.get('cat_search_msg_id'))
+    except: pass
+
     if edit and update.callback_query:
-        try:
-            await update.callback_query.message.delete()
-        except:
-            pass
-            
+        try: await update.callback_query.message.delete()
+        except: pass
+
+    # Main prompt with scrollable ReplyKeyboard
+    text = get_summary(context.user_data) + "Select a Category 👇  _(or tap 🔍 below to search):_"
     if update.message:
-        msg = await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+        msg = await update.message.reply_text(text, reply_markup=_build_category_keyboard(categories), parse_mode="Markdown")
     else:
-        msg = await context.bot.send_message(update.effective_chat.id, text, reply_markup=reply_markup, parse_mode="Markdown")
-        
+        msg = await context.bot.send_message(chat_id, text, reply_markup=_build_category_keyboard(categories), parse_mode="Markdown")
     context.user_data['prompt_msg_id'] = msg.message_id
+
+    # Inline search button — tapping opens @bot in the text field for live autocomplete
+    search_markup = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔍 Search Category (autocomplete)", switch_inline_query_current_chat="")
+    ]])
+    hint_msg = await context.bot.send_message(
+        chat_id,
+        "_Tip: Tap above to type and get instant suggestions_ ✨",
+        reply_markup=search_markup,
+        parse_mode="Markdown"
+    )
+    context.user_data['cat_search_msg_id'] = hint_msg.message_id
     return CATEGORY
 
 
@@ -246,31 +268,64 @@ async def handle_amount_callback(update: Update, context: ContextTypes.DEFAULT_T
 
 async def handle_category(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    
+    chat_id = update.effective_chat.id
+
     if text == "❌ Cancel":
         await remove_reply_keyboard(update, context)
+        try: await context.bot.delete_message(chat_id, context.user_data.get('cat_search_msg_id'))
+        except: pass
         return await cancel(update, context)
+
     elif text == "🔙 Back":
         await remove_reply_keyboard(update, context)
         context.user_data.pop('amount', None)
         try: await update.message.delete()
         except: pass
-        try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+        try: await context.bot.delete_message(chat_id, context.user_data.get('prompt_msg_id'))
+        except: pass
+        try: await context.bot.delete_message(chat_id, context.user_data.get('cat_search_msg_id'))
         except: pass
         return await prompt_amount(update, context, edit=False)
-        
+
     if text not in CONFIG['categories']:
-        await update.message.reply_text("❌ Please select a category from the bottom menu.")
+        await update.message.reply_text("❌ Please select a category from the menu.")
         return CATEGORY
-        
+
+    # ── Valid category selected ────────────────────────────────────────────
     context.user_data['category'] = text
     try: await update.message.delete()
     except: pass
-    try: await context.bot.delete_message(update.effective_chat.id, context.user_data.get('prompt_msg_id'))
+    try: await context.bot.delete_message(chat_id, context.user_data.get('prompt_msg_id'))
     except: pass
-    
+    try: await context.bot.delete_message(chat_id, context.user_data.get('cat_search_msg_id'))
+    except: pass
+
     await remove_reply_keyboard(update, context)
     return await prompt_title(update, context, edit=False)
+
+
+async def category_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Live autocomplete: fires as the user types after tapping the 🔍 Search button."""
+    query = update.inline_query.query.strip().lower()
+    categories = CONFIG['categories']
+
+    # Show all categories when nothing typed yet, else filter
+    if query:
+        matches = [cat for cat in categories if query in cat.lower()]
+    else:
+        matches = categories  # show all as starting suggestions
+
+    results = [
+        InlineQueryResultArticle(
+            id=str(i),
+            title=cat,
+            input_message_content=InputTextMessageContent(cat),
+            description="Tap to select this category"
+        )
+        for i, cat in enumerate(matches[:20])  # Telegram inline max shown is ~15-20
+    ]
+
+    await update.inline_query.answer(results, cache_time=0, is_personal=True)
 
 
 async def handle_title(update: Update, context: ContextTypes.DEFAULT_TYPE):

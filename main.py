@@ -12,6 +12,7 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     ConversationHandler,
+    InlineQueryHandler,
     TypeHandler,
     filters,
 )
@@ -23,7 +24,7 @@ from bot.handlers.handlers import (
     handle_datetime_callback, handle_custom_datetime,
     handle_txn_type,
     handle_amount, handle_amount_callback,
-    handle_category,
+    handle_category, category_inline_query,
     handle_title, handle_title_callback,
     handle_note, handle_note_callback,
     save_transaction,
@@ -92,10 +93,11 @@ async def main():
     application.add_handler(TypeHandler(Update, check_allowlist), group=-1)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(conv_handler)
+    application.add_handler(InlineQueryHandler(category_inline_query))
     
     await application.initialize()
     await application.start()
-    await application.updater.start_polling()
+    await application.updater.start_polling(allowed_updates=["message", "callback_query", "inline_query"])
     
     await start_web_server()
     
