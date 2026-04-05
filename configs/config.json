@@ -1,0 +1,79 @@
+{
+  "categories": [
+    
+    "Commute",
+
+    "Salary",
+
+    "Doctor Visit",
+    "Medicines",
+
+    "Hair-Cut",
+    "Shaving",
+
+    "Electricity Bill",
+    "PNG Gas Bill",
+    "Internet Bill",
+    "Mobile Recharge",
+
+    "Groceries",
+    "Dining",
+    "Fast Food",
+    "Healthy Fast Food",
+    "Food Delivery",
+
+    "Equity MF Investments",
+    "Debt MF Investments",
+    "Gold ETF Investments",
+    "Silver ETF Investments",
+    "Stocks",
+    "Fixed Deposits",
+    "Health Insurance",
+    "Life Insurance",
+    "LIC",
+    "Taxes",
+
+    "Shopping",
+    "Skin Care",
+    "Clothing",
+    "Shoes",
+    "Electronics",
+    "Furniture",
+    "Books",
+
+    "Entertainment",
+    "Movies",
+    "Gaming",
+    "Party",
+    "Gifts",
+
+    "Travel",
+
+    "Subscriptions",
+    "Work",
+    "ATM Cash Withdrawal",
+    "Cash Payment",
+    "Money Transfer",
+    "Emergency",
+
+    "Rent",
+    "House Maintenance & Repairs",
+    "Property Taxes",
+
+    "Dividends",
+    "Refunds",
+
+    "Gym",
+
+    "EMI",
+
+    "Other"
+  ],
+  "accounts": [
+    "Millennia CC",
+    "Amazon Pay CC",
+    "HDFC Savings",
+    "ICICI Savings",
+    "Union Savings"
+  ]
+}

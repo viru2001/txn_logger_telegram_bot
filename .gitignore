@@ -1,4 +1,6 @@
 .env
-credentials.json
+configs/credentials.json
 __pycache__/
+*.py[cod]
+*$py.class
 venv/

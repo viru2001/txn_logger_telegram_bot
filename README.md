@@ -16,8 +16,8 @@ A Telegram bot to track expenses, log them into a Google Sheet, and generate Cas
 4. Go to **APIs & Services > Credentials**.
 5. Click **Create Credentials > Service Account**.
 6. Once created, go to the Service Account settings, navigate to the **Keys** tab, and select **Add Key > Create new key > JSON**.
-7. Rename the downloaded JSON file to `credentials.json` and place it in this folder.
-8. **IMPORTANT:** Open your Google Sheet, click "Share" in the top right, and share it (Editor access) with the `client_email` found inside your `credentials.json` file.
+7. Rename the downloaded JSON file to `credentials.json` and place it in the `configs/` folder.
+8. **IMPORTANT:** Open your Google Sheet, click "Share" in the top right, and share it (Editor access) with the `client_email` found inside your `configs/credentials.json` file.
 
 ### 3. Setup Your Environment
 1. Create a copy of `.env.example` and name it `.env`.
