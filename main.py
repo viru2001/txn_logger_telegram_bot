@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from aiohttp import web
 
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -37,6 +37,9 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+
+
 
 
 async def health_check(request):
@@ -88,6 +91,7 @@ async def main():
             ACCOUNT: [CallbackQueryHandler(save_transaction)]
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        per_message=False,
     )
 
     application.add_handler(TypeHandler(Update, check_allowlist), group=-1)
@@ -96,6 +100,15 @@ async def main():
     application.add_handler(InlineQueryHandler(category_inline_query))
     
     await application.initialize()
+
+    # Register bot commands so they appear in Telegram's menu button (☰ / slash icon)
+    await application.bot.set_my_commands([
+        BotCommand("add", "Log a new transaction"),
+        BotCommand("cancel", "Cancel the current transaction"),
+        BotCommand("start", "Show welcome message"),
+    ])
+    logger.info("Bot menu commands registered.")
+
     await application.start()
     await application.updater.start_polling(allowed_updates=["message", "callback_query", "inline_query"])
     

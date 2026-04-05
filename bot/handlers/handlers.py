@@ -320,7 +320,7 @@ async def category_inline_query(update: Update, context: ContextTypes.DEFAULT_TY
             id=str(i),
             title=cat,
             input_message_content=InputTextMessageContent(cat),
-            description="Tap to select this category"
+            # description="Tap to select this category"
         )
         for i, cat in enumerate(matches[:20])  # Telegram inline max shown is ~15-20
     ]
